@@ -8,7 +8,7 @@ from nengo.builder.transforms import ConvInc, ConvTransposeInc
 from nengo.transforms import ChannelShape, Convolution, ConvolutionTranspose
 
 
-@pytest.mark.parametrize("channels_last", (True, False))
+@pytest.mark.parametrize("channels_last", (True,False))
 @pytest.mark.parametrize("stride0", (1, 2))
 @pytest.mark.parametrize("stride1", (1, 2))
 @pytest.mark.parametrize("kernel0", (4, 5))
@@ -19,7 +19,7 @@ def test_convinc_2d(
     channels_last, stride0, stride1, kernel0, kernel1, padding, groups, rng, allclose
 ):
     correlate2d = pytest.importorskip("scipy.signal").correlate2d
-
+    #import pdb; pdb.set_trace()
     shape0 = 16
     shape1 = 17
     in_channels = 32
@@ -48,7 +48,17 @@ def test_convinc_2d(
     step = ConvInc(w, x, y, conv).make_step(signals, None, None)
 
     step()
+    import tensorflow as tf
+    if channels_last == True:
+        data_format = "channels_last"
+        input_ = tf.keras.Input((shape0, shape1, in_channels))
+    else:
+        data_format = "channels_first"
+        input_ = tf.keras.Input((in_channels, shape0, shape1))   
 
+    conv2d_keras = tf.keras.layers.Conv2D(out_channels, (kernel0, kernel1), padding = padding, use_bias = False, groups = groups, strides = (stride0, stride1), data_format = data_format)
+    conv2d_keras(input_)
+    conv2d_keras.set_weights(np.array([w.initial_value]))
     x0 = x.initial_value
 
     if not channels_last:
@@ -86,7 +96,7 @@ def test_convinc_2d(
     y0 = y0[::stride0, ::stride1, :]
     if not channels_last:
         y0 = np.moveaxis(y0, -1, 0)
-
+    assert np.all(np.abs(conv2d_keras(np.array([x.initial_value], dtype= np.float32)).numpy()[0] - signals[y]) < .001)
     assert allclose(signals[y], y0)
 
 
