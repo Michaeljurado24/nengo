@@ -5,21 +5,21 @@ import nengo
 from nengo._vendor.npconv2d import conv2d
 from nengo.exceptions import BuildError, ValidationError
 
-
+@pytest.mark.parametrize("groups", (1, 2))
 @pytest.mark.parametrize("x_mul", (1, 2, 3, 4))
 @pytest.mark.parametrize("k_size", (1, 2, 3, 4))
 @pytest.mark.parametrize("stride", (1, 2, 3, 4))
 @pytest.mark.parametrize("padding", ("same", "valid"))
-def test_convolution_shape(padding, stride, k_size, x_mul, rng, allclose):
+def test_convolution_shape(padding, stride, k_size, x_mul, groups, rng, allclose):
     tf = pytest.importorskip("tensorflow")
 
     in_channels = 2
-    out_channels = 3
+    out_channels = 4
 
     for i in range(2 * k_size):
         x_size = k_size + stride * (x_mul - 1) + i
         x_shape = (x_size, x_size, in_channels)
-        k_shape = (k_size, k_size, in_channels, out_channels)
+        k_shape = (k_size, k_size, in_channels//groups, out_channels)
 
         x = rng.uniform(-1, 1, size=x_shape)
         kernel = rng.uniform(-1, 1, size=k_shape)
@@ -37,6 +37,7 @@ def test_convolution_shape(padding, stride, k_size, x_mul, rng, allclose):
             kernel_size=(k_size, k_size),
             strides=(stride, stride),
             padding=padding,
+            groups=groups
         )
 
         assert transform.output_shape.shape == y_tf.shape
@@ -202,6 +203,10 @@ def test_convolution_validation_errors():
     # test empty output
     with pytest.raises(ValidationError, match="exceeds the spatial size"):
         nengo.transforms.Convolution(n_filters=2, input_shape=(3, 2, 1))
+
+    # test invalid groups
+    with pytest.raises(ValidationError, match="Invalid Group"):
+        nengo.transforms.Convolution(n_filters=2, input_shape=(3, 2, 1), groups = 3)
 
     # valid output shape
     nengo.transforms.ConvolutionTranspose(
