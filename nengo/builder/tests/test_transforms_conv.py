@@ -14,8 +14,9 @@ from nengo.transforms import ChannelShape, Convolution, ConvolutionTranspose
 @pytest.mark.parametrize("kernel0", (4, 5))
 @pytest.mark.parametrize("kernel1", (4, 5))
 @pytest.mark.parametrize("padding", ("same", "valid"))
+@pytest.mark.parametrize("groups",  (1, 8, 32))
 def test_convinc_2d(
-    channels_last, stride0, stride1, kernel0, kernel1, padding, rng, allclose
+    channels_last, stride0, stride1, kernel0, kernel1, padding, groups, rng, allclose
 ):
     correlate2d = pytest.importorskip("scipy.signal").correlate2d
 
@@ -28,8 +29,8 @@ def test_convinc_2d(
         if channels_last
         else (in_channels, shape0, shape1)
     )
-    x = Signal(rng.randn(*x_shape))
-    w = Signal(rng.randn(kernel0, kernel1, in_channels, out_channels))
+    x = Signal((rng.randn(*x_shape)))
+    w = Signal(rng.randn(kernel0, kernel1, in_channels//groups, out_channels))
 
     conv = Convolution(
         out_channels,
@@ -38,6 +39,7 @@ def test_convinc_2d(
         strides=(stride0, stride1),
         padding=padding,
         channels_last=channels_last,
+        groups = groups
     )
 
     y = Signal(np.zeros(conv.output_shape.shape))
@@ -72,8 +74,8 @@ def test_convinc_2d(
         [
             np.sum(
                 [
-                    correlate2d(x0[..., j], w.initial_value[..., j, i], mode="valid")
-                    for j in range(in_channels)
+                    correlate2d(x0[..., j + (i//(out_channels//groups)) * (in_channels//groups)], w.initial_value[..., j, i], mode="valid")
+                    for j in range(in_channels//groups)
                 ],
                 axis=0,
             )

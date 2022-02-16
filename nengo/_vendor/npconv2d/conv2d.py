@@ -185,21 +185,30 @@ def conv2d(x, w, pad='SAME', stride=(1, 1)):
     """2D convolution (technically speaking, correlation).
     Args:
         x: [N, H, W, C]
-        w: [I, J, C, K]
+        w: [I, J, C/G, K]
         pad: [PH, PW]
         stride: [SH, SW]
     Returns:
         y: [N, H', W', K]
     """
     ksize = w.shape[:2]
+    c = x.shape[-1]
+    groups = c // w.shape[2] # number of groups inferred
+
+
     x = extract_sliding_windows(x, ksize, pad, stride)
+    x = x.reshape(x.shape[:-1] + (groups,) + (c//groups,))  # split windows into groups
+    x = np.moveaxis(x, -2, 0)  # move groups to axis 0
+
+    w = w.reshape(w.shape[:-1] + (groups,) + (w.shape[-1]//groups,)) # split weights into groups
+    w = np.moveaxis(w, -2, 0)  # move groups to axis 0
     ws = w.shape
-    w = w.reshape([ws[0] * ws[1] * ws[2], ws[3]])
+    w = w.reshape([groups, ws[1] * ws[2] * ws[3], ws[4]])
     xs = x.shape
-    x = x.reshape([xs[0] * xs[1] * xs[2], -1])
-    y = x.dot(w)
-    y = y.reshape([xs[0], xs[1], xs[2], -1])
-    return y
+    x = x.reshape([groups, xs[1] * xs[2]* xs[3], -1])
+    y = np.einsum('ikj,ijm->kim', x, w)
+    y = y.reshape([xs[1], xs[2], xs[3], -1])
+    return y 
 
 
 def conv2d_gradx(w, dy, xsize, pad='SAME', stride=(1, 1)):

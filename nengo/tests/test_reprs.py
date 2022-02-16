@@ -576,6 +576,7 @@ def test_transforms():
             "padding",
             "channels_last",
             "init",
+            "groups"
         ],
     )
     check_repr(Convolution(n_filters=3, input_shape=(3, 4, 5)))
